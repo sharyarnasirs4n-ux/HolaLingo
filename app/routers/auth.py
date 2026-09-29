@@ -2,7 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.dependencies import get_current_user
 from app.database import get_db
-from app.models import User, UserProgress,AuthAccount
+from app.models import (
+    User,
+    UserProgress,
+    AuthAccount,
+    LessonCompletion,
+    StudySession,
+    UserAchievement,
+    DailyChallenge,
+    DailyChallengeQuestion,
+    DailyChallengeCompletion,
+    UserLearnedWord,
+    UserFavoriteWord,
+)
 from app.schemas import UserCreate, UserLogin, UserResponse, TokenResponse,GoogleLogin, AppleLogin,ProfileUpdate
 from app.security import (
     hash_password,
@@ -300,3 +312,40 @@ def update_profile(
     db.refresh(current_user)
 
     return current_user
+
+
+@router.delete("/account")
+def delete_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user_id = current_user.id
+
+    db.query(UserLearnedWord).filter(
+        UserLearnedWord.user_id == user_id
+    ).delete(synchronize_session=False)
+
+    db.query(UserFavoriteWord).filter(
+        UserFavoriteWord.user_id == user_id
+    ).delete(synchronize_session=False)
+
+    db.query(DailyChallengeCompletion).filter(
+        DailyChallengeCompletion.user_id == user_id
+    ).delete(synchronize_session=False)
+
+    challenges = (
+        db.query(DailyChallenge)
+        .filter(DailyChallenge.user_id == user_id)
+        .all()
+    )
+
+    for challenge in challenges:
+        db.delete(challenge)
+
+    db.delete(current_user)
+
+    db.commit()
+
+    return {
+        "message": "Account permanently deleted"
+    }
